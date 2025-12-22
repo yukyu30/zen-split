@@ -9,13 +9,17 @@ interface AppSettings {
   leftUrl: string
   rightUrl: string
   splitRatio: number
+  dividerColor: string
+  swapped: boolean
 }
 
 // デフォルト設定
 const defaultSettings: AppSettings = {
   leftUrl: '',
   rightUrl: '',
-  splitRatio: 50
+  splitRatio: 50,
+  dividerColor: '#3c3c3c',
+  swapped: false
 }
 
 // 設定ファイルのパス
