@@ -1,5 +1,5 @@
-appId: com.electron.app
-productName: zen-split
+appId: com.zensplit.app
+productName: Zen Split
 directories:
   buildResources: build
 files:

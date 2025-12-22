@@ -1,8 +1,36 @@
-import { contextBridge } from 'electron'
+import { contextBridge, ipcRenderer } from 'electron'
 import { electronAPI } from '@electron-toolkit/preload'
 
+// 設定の型定義
+export interface AppSettings {
+  leftUrl: string
+  rightUrl: string
+  splitRatio: number
+}
+
 // Custom APIs for renderer
-const api = {}
+const api = {
+  // 設定を取得
+  getSettings: (): Promise<AppSettings> => ipcRenderer.invoke('get-settings'),
+
+  // 設定を保存
+  saveSettings: (settings: AppSettings): Promise<boolean> =>
+    ipcRenderer.invoke('save-settings', settings),
+
+  // 設定ウィンドウを開く
+  openSettings: (): void => ipcRenderer.send('open-settings'),
+
+  // 設定更新の通知を受け取る
+  onSettingsUpdated: (callback: (settings: AppSettings) => void): (() => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, settings: AppSettings): void => {
+      callback(settings)
+    }
+    ipcRenderer.on('settings-updated', handler)
+    return () => {
+      ipcRenderer.removeListener('settings-updated', handler)
+    }
+  }
+}
 
 // Use `contextBridge` APIs to expose Electron APIs to
 // renderer only if context isolation is enabled, otherwise

@@ -1,34 +1,108 @@
-import Versions from './components/Versions'
-import electronLogo from './assets/electron.svg'
+import { useEffect, useState, useRef, useCallback } from 'react'
+import type { AppSettings } from '../../preload/index.d'
+import './App.css'
 
 function App(): React.JSX.Element {
-  const ipcHandle = (): void => window.electron.ipcRenderer.send('ping')
+  const [settings, setSettings] = useState<AppSettings>({
+    leftUrl: '',
+    rightUrl: '',
+    splitRatio: 50
+  })
+  const [isDragging, setIsDragging] = useState(false)
+  const containerRef = useRef<HTMLDivElement>(null)
+
+  // 設定を読み込む
+  useEffect(() => {
+    window.api.getSettings().then(setSettings)
+
+    // 設定更新の通知を受け取る
+    const unsubscribe = window.api.onSettingsUpdated(setSettings)
+    return unsubscribe
+  }, [])
+
+  // 分割バーのドラッグ処理
+  const handleMouseDown = useCallback(() => {
+    setIsDragging(true)
+  }, [])
+
+  const handleMouseMove = useCallback(
+    (e: MouseEvent) => {
+      if (!isDragging || !containerRef.current) return
+
+      const rect = containerRef.current.getBoundingClientRect()
+      const x = e.clientX - rect.left
+      const ratio = Math.min(Math.max((x / rect.width) * 100, 10), 90)
+
+      setSettings((prev) => ({ ...prev, splitRatio: ratio }))
+    },
+    [isDragging]
+  )
+
+  const handleMouseUp = useCallback(() => {
+    if (isDragging) {
+      setIsDragging(false)
+      // 分割割合を保存
+      window.api.saveSettings(settings)
+    }
+  }, [isDragging, settings])
+
+  useEffect(() => {
+    if (isDragging) {
+      window.addEventListener('mousemove', handleMouseMove)
+      window.addEventListener('mouseup', handleMouseUp)
+      return (): void => {
+        window.removeEventListener('mousemove', handleMouseMove)
+        window.removeEventListener('mouseup', handleMouseUp)
+      }
+    }
+    return undefined
+  }, [isDragging, handleMouseMove, handleMouseUp])
+
+  // 設定ウィンドウを開く
+  const openSettings = (): void => {
+    window.api.openSettings()
+  }
 
   return (
-    <>
-      <img alt="logo" className="logo" src={electronLogo} />
-      <div className="creator">Powered by electron-vite</div>
-      <div className="text">
-        Build an Electron app with <span className="react">React</span>
-        &nbsp;and <span className="ts">TypeScript</span>
+    <div className={`app-container ${isDragging ? 'dragging' : ''}`} ref={containerRef}>
+      {/* 左側のWebView */}
+      <div
+        className={`webview-container ${isDragging ? 'dragging' : ''}`}
+        style={{ width: `${settings.splitRatio}%` }}
+      >
+        {settings.leftUrl ? (
+          <webview src={settings.leftUrl} className="webview" />
+        ) : (
+          <div className="placeholder">
+            <button onClick={openSettings} className="setup-button">
+              左側のURLを設定
+            </button>
+          </div>
+        )}
       </div>
-      <p className="tip">
-        Please try pressing <code>F12</code> to open the devTool
-      </p>
-      <div className="actions">
-        <div className="action">
-          <a href="https://electron-vite.org/" target="_blank" rel="noreferrer">
-            Documentation
-          </a>
-        </div>
-        <div className="action">
-          <a target="_blank" rel="noreferrer" onClick={ipcHandle}>
-            Send IPC
-          </a>
-        </div>
+
+      {/* 分割バー */}
+      <div
+        className={`divider ${isDragging ? 'dragging' : ''}`}
+        onMouseDown={handleMouseDown}
+      />
+
+      {/* 右側のWebView */}
+      <div
+        className={`webview-container ${isDragging ? 'dragging' : ''}`}
+        style={{ width: `${100 - settings.splitRatio}%` }}
+      >
+        {settings.rightUrl ? (
+          <webview src={settings.rightUrl} className="webview" />
+        ) : (
+          <div className="placeholder">
+            <button onClick={openSettings} className="setup-button">
+              右側のURLを設定
+            </button>
+          </div>
+        )}
       </div>
-      <Versions></Versions>
-    </>
+    </div>
   )
 }
 
