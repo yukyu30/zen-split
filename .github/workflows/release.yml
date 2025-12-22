@@ -13,7 +13,7 @@ jobs:
     strategy:
       matrix:
         include:
-          - os: macos-latest
+          - os: macos-14
             platform: mac
             arch: arm64
           - os: windows-latest
