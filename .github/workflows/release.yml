@@ -35,11 +35,31 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Build for macOS (arm64 with ad-hoc signing)
+      - name: Build for macOS (arm64)
         if: matrix.platform == 'mac'
-        run: npm run build:mac -- --arm64
+        run: npm run build:mac -- --arm64 -c.mac.identity=null
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Ad-hoc sign macOS app
+        if: matrix.platform == 'mac'
+        run: |
+          APP_PATH="dist/mac-arm64/Zen Split.app"
+          echo "Signing $APP_PATH with ad-hoc signature..."
+          codesign --force --deep --sign - "$APP_PATH"
+          codesign -dv "$APP_PATH"
+
+      - name: Recreate DMG with signed app
+        if: matrix.platform == 'mac'
+        run: |
+          # Remove old DMG
+          rm -f dist/*.dmg
+          # Get version from package.json
+          VERSION=$(node -p "require('./package.json').version")
+          DMG_NAME="zen-split-${VERSION}-arm64.dmg"
+          # Create new DMG
+          hdiutil create -volname "Zen Split" -srcfolder "dist/mac-arm64/Zen Split.app" -ov -format UDZO "dist/${DMG_NAME}"
+          echo "Created: dist/${DMG_NAME}"
 
       - name: Build for Windows
         if: matrix.platform == 'win'
