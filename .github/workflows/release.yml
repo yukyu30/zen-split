@@ -37,7 +37,7 @@ jobs:
 
       - name: Build for macOS (arm64 with ad-hoc signing)
         if: matrix.platform == 'mac'
-        run: npm run build:mac -- --arm64 -c.mac.identity="-"
+        run: npm run build:mac -- --arm64
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
