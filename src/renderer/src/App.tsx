@@ -6,7 +6,9 @@ function App(): React.JSX.Element {
   const [settings, setSettings] = useState<AppSettings>({
     leftUrl: '',
     rightUrl: '',
-    splitRatio: 50
+    splitRatio: 50,
+    dividerColor: '#3c3c3c',
+    swapped: false
   })
   const [isDragging, setIsDragging] = useState(false)
   const containerRef = useRef<HTMLDivElement>(null)
@@ -63,19 +65,25 @@ function App(): React.JSX.Element {
     window.api.openSettings()
   }
 
+  // swappedに応じてURLを決定
+  const firstUrl = settings.swapped ? settings.rightUrl : settings.leftUrl
+  const secondUrl = settings.swapped ? settings.leftUrl : settings.rightUrl
+  const firstLabel = settings.swapped ? '右側' : '左側'
+  const secondLabel = settings.swapped ? '左側' : '右側'
+
   return (
     <div className={`app-container ${isDragging ? 'dragging' : ''}`} ref={containerRef}>
-      {/* 左側のWebView */}
+      {/* 最初のWebView */}
       <div
         className={`webview-container ${isDragging ? 'dragging' : ''}`}
         style={{ width: `${settings.splitRatio}%` }}
       >
-        {settings.leftUrl ? (
-          <webview src={settings.leftUrl} className="webview" />
+        {firstUrl ? (
+          <webview src={firstUrl} className="webview" />
         ) : (
           <div className="placeholder">
             <button onClick={openSettings} className="setup-button">
-              左側のURLを設定
+              {firstLabel}のURLを設定
             </button>
           </div>
         )}
@@ -84,20 +92,21 @@ function App(): React.JSX.Element {
       {/* 分割バー */}
       <div
         className={`divider ${isDragging ? 'dragging' : ''}`}
+        style={{ backgroundColor: settings.dividerColor }}
         onMouseDown={handleMouseDown}
       />
 
-      {/* 右側のWebView */}
+      {/* 2番目のWebView */}
       <div
         className={`webview-container ${isDragging ? 'dragging' : ''}`}
         style={{ width: `${100 - settings.splitRatio}%` }}
       >
-        {settings.rightUrl ? (
-          <webview src={settings.rightUrl} className="webview" />
+        {secondUrl ? (
+          <webview src={secondUrl} className="webview" />
         ) : (
           <div className="placeholder">
             <button onClick={openSettings} className="setup-button">
-              右側のURLを設定
+              {secondLabel}のURLを設定
             </button>
           </div>
         )}

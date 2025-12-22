@@ -6,6 +6,8 @@ export interface AppSettings {
   leftUrl: string
   rightUrl: string
   splitRatio: number
+  dividerColor: string
+  swapped: boolean
 }
 
 // Custom APIs for renderer

@@ -12,7 +12,7 @@ body {
 
 .settings-container {
   padding: 24px;
-  max-width: 450px;
+  max-width: 700px;
   margin: 0 auto;
 }
 
@@ -23,8 +23,19 @@ body {
   color: #ffffff;
 }
 
+.url-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
 .form-group {
-  margin-bottom: 20px;
+  margin-bottom: 0;
+}
+
+.url-group {
+  flex: 1;
 }
 
 .form-group label {
@@ -35,7 +46,7 @@ body {
   color: #cccccc;
 }
 
-.form-group input {
+.form-group input[type="url"] {
   width: 100%;
   padding: 12px;
   font-size: 14px;
@@ -53,6 +64,52 @@ body {
 
 .form-group input::placeholder {
   color: #6c6c6c;
+}
+
+.swap-button {
+  width: 44px;
+  height: 44px;
+  font-size: 20px;
+  font-weight: 500;
+  background-color: #2d2d2d;
+  color: white;
+  border: 1px solid #3c3c3c;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background-color 0.2s, border-color 0.2s;
+  flex-shrink: 0;
+}
+
+.swap-button:hover {
+  background-color: #3c3c3c;
+  border-color: #0078d4;
+}
+
+.color-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.color-row label {
+  font-size: 14px;
+  font-weight: 500;
+  color: #cccccc;
+}
+
+.color-input {
+  width: 44px;
+  height: 44px;
+  padding: 2px;
+  border: 1px solid #3c3c3c;
+  border-radius: 6px;
+  background-color: #2d2d2d;
+  cursor: pointer;
+}
+
+.color-input:hover {
+  border-color: #0078d4;
 }
 
 .save-button {
