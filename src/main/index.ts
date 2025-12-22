@@ -70,7 +70,9 @@ function createWindow(): void {
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       sandbox: false,
-      webviewTag: true
+      webviewTag: true,
+      backgroundThrottling: false,
+      spellcheck: false
     }
   })
 
@@ -92,32 +94,66 @@ function createWindow(): void {
   }
 }
 
-// 設定ウィンドウを作成
-function createSettingsWindow(): void {
-  if (settingsWindow) {
-    settingsWindow.focus()
-    return
-  }
+// 設定ウィンドウを事前作成（非表示）
+function prepareSettingsWindow(): void {
+  if (settingsWindow) return
 
   settingsWindow = new BrowserWindow({
-    width: 500,
-    height: 400,
+    width: 600,
+    height: 300,
     parent: mainWindow || undefined,
     modal: false,
     show: false,
     resizable: false,
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
-      sandbox: false
+      sandbox: false,
+      backgroundThrottling: false
     }
-  })
-
-  settingsWindow.on('ready-to-show', () => {
-    settingsWindow?.show()
   })
 
   settingsWindow.on('closed', () => {
     settingsWindow = null
+    // 閉じたら再度準備
+    setTimeout(prepareSettingsWindow, 100)
+  })
+
+  if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
+    settingsWindow.loadURL(`${process.env['ELECTRON_RENDERER_URL']}/settings.html`)
+  } else {
+    settingsWindow.loadFile(join(__dirname, '../renderer/settings.html'))
+  }
+}
+
+// 設定ウィンドウを表示
+function showSettingsWindow(): void {
+  if (settingsWindow) {
+    settingsWindow.show()
+    settingsWindow.focus()
+    return
+  }
+
+  // ウィンドウがない場合は作成して表示
+  settingsWindow = new BrowserWindow({
+    width: 600,
+    height: 300,
+    parent: mainWindow || undefined,
+    modal: false,
+    show: false,
+    resizable: false,
+    webPreferences: {
+      preload: join(__dirname, '../preload/index.js'),
+      sandbox: false,
+      backgroundThrottling: false
+    }
+  })
+
+  settingsWindow.on('closed', () => {
+    settingsWindow = null
+  })
+
+  settingsWindow.once('ready-to-show', () => {
+    settingsWindow?.show()
   })
 
   if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
@@ -137,7 +173,7 @@ function createMenu(): void {
           label: '設定',
           accelerator: 'CmdOrCtrl+,',
           click: (): void => {
-            createSettingsWindow()
+            showSettingsWindow()
           }
         },
         { type: 'separator' },
@@ -204,11 +240,16 @@ app.whenReady().then(() => {
 
   // 設定ウィンドウを開く
   ipcMain.on('open-settings', () => {
-    createSettingsWindow()
+    showSettingsWindow()
   })
 
   createMenu()
   createWindow()
+
+  // メインウィンドウ表示後に設定ウィンドウを事前準備
+  mainWindow?.once('ready-to-show', () => {
+    setTimeout(prepareSettingsWindow, 500)
+  })
 
   app.on('activate', function () {
     // On macOS it's common to re-create a window in the app when the

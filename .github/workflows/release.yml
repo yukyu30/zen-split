@@ -16,9 +16,6 @@ jobs:
           - os: macos-latest
             platform: mac
             arch: arm64
-          - os: macos-latest
-            platform: mac
-            arch: x64
           - os: windows-latest
             platform: win
             arch: x64
@@ -39,17 +36,10 @@ jobs:
         run: npm ci
 
       - name: Build for macOS (arm64 with ad-hoc signing)
-        if: matrix.platform == 'mac' && matrix.arch == 'arm64'
+        if: matrix.platform == 'mac'
         run: npm run build:mac -- --arm64 -c.mac.identity="-"
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Build for macOS (x64 without signing)
-        if: matrix.platform == 'mac' && matrix.arch == 'x64'
-        run: npm run build:mac -- --x64
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          CSC_IDENTITY_AUTO_DISCOVERY: false
 
       - name: Build for Windows
         if: matrix.platform == 'win'
