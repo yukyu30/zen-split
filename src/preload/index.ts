@@ -25,6 +25,10 @@ const api = {
   // splitRatioをリアルタイム更新（ドラッグ中）
   updateSplitRatio: (ratio: number): void => ipcRenderer.send('update-split-ratio', ratio),
 
+  // ドラッグ開始/終了を通知
+  startDragging: (): void => ipcRenderer.send('start-dragging'),
+  stopDragging: (): void => ipcRenderer.send('stop-dragging'),
+
   // 設定更新の通知を受け取る
   onSettingsUpdated: (callback: (settings: AppSettings) => void): (() => void) => {
     const handler = (_event: Electron.IpcRendererEvent, settings: AppSettings): void => {

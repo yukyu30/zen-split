@@ -69,6 +69,9 @@ const DIVIDER_WIDTH = 6
 // 現在の設定を保持
 let currentSettings: AppSettings = defaultSettings
 
+// ドラッグ中かどうか
+let isDragging = false
+
 // WebContentsViewのレイアウトを更新
 function updateViewBounds(): void {
   if (!mainWindow || !leftView || !rightView || !uiView) return
@@ -101,31 +104,42 @@ function updateViewBounds(): void {
     height: height
   })
 
-  // UIオーバーレイ（分割バー領域のみ - クリック透過のため）
-  // URLが未設定の場合は、その領域もカバーする
-  const leftUrl = currentSettings.swapped ? currentSettings.rightUrl : currentSettings.leftUrl
-  const rightUrl = currentSettings.swapped ? currentSettings.leftUrl : currentSettings.rightUrl
+  // UIオーバーレイのサイズを決定
+  // ドラッグ中は全画面にして座標計算を安定させる
+  if (isDragging) {
+    uiView.setBounds({
+      x: 0,
+      y: 0,
+      width: width,
+      height: height
+    })
+  } else {
+    // 通常時は分割バー領域のみ（クリック透過のため）
+    // URLが未設定の場合は、その領域もカバーする
+    const leftUrl = currentSettings.swapped ? currentSettings.rightUrl : currentSettings.leftUrl
+    const rightUrl = currentSettings.swapped ? currentSettings.leftUrl : currentSettings.rightUrl
 
-  let uiX = leftWidth
-  let uiWidth = DIVIDER_WIDTH
+    let uiX = leftWidth
+    let uiWidth = DIVIDER_WIDTH
 
-  // 左側URLが未設定の場合、左側領域もカバー
-  if (!leftUrl) {
-    uiX = 0
-    uiWidth = leftWidth + DIVIDER_WIDTH
+    // 左側URLが未設定の場合、左側領域もカバー
+    if (!leftUrl) {
+      uiX = 0
+      uiWidth = leftWidth + DIVIDER_WIDTH
+    }
+
+    // 右側URLが未設定の場合、右側領域もカバー
+    if (!rightUrl) {
+      uiWidth = width - uiX
+    }
+
+    uiView.setBounds({
+      x: uiX,
+      y: 0,
+      width: uiWidth,
+      height: height
+    })
   }
-
-  // 右側URLが未設定の場合、右側領域もカバー
-  if (!rightUrl) {
-    uiWidth = width - uiX
-  }
-
-  uiView.setBounds({
-    x: uiX,
-    y: 0,
-    width: uiWidth,
-    height: height
-  })
 }
 
 // URLを読み込む
@@ -383,6 +397,18 @@ app.whenReady().then(() => {
   // 設定ウィンドウを開く
   ipcMain.on('open-settings', () => {
     showSettingsWindow()
+  })
+
+  // ドラッグ開始
+  ipcMain.on('start-dragging', () => {
+    isDragging = true
+    updateViewBounds()
+  })
+
+  // ドラッグ終了
+  ipcMain.on('stop-dragging', () => {
+    isDragging = false
+    updateViewBounds()
   })
 
   createMenu()

@@ -14,7 +14,6 @@ function App(): React.JSX.Element {
     swapped: false
   })
   const [isDragging, setIsDragging] = useState(false)
-  const [uiOffset, setUiOffset] = useState(0)
   const containerRef = useRef<HTMLDivElement>(null)
 
   // 設定を読み込む
@@ -26,48 +25,29 @@ function App(): React.JSX.Element {
     return unsubscribe
   }, [])
 
-  // UIオフセットを計算（uiViewの開始位置）
-  useEffect(() => {
-    if (!containerRef.current) return
-
-    const leftUrl = settings.swapped ? settings.rightUrl : settings.leftUrl
-
-    // uiViewが分割バー位置から開始する場合のオフセットを計算
-    // メインプロセスと同じロジック
-    if (leftUrl) {
-      // 左側URLが設定されている場合、uiViewは分割バー位置から開始
-      const width = window.innerWidth
-      const leftRatio = settings.swapped ? 100 - settings.splitRatio : settings.splitRatio
-      const leftWidth = Math.floor((width * leftRatio) / 100) - DIVIDER_WIDTH / 2
-      setUiOffset(leftWidth)
-    } else {
-      setUiOffset(0)
-    }
-  }, [settings])
-
   // 分割バーのドラッグ処理
   const handleMouseDown = useCallback(() => {
     setIsDragging(true)
+    // メインプロセスに通知（uiViewを全画面にする）
+    window.api.startDragging()
   }, [])
 
-  const handleMouseMove = useCallback(
-    (e: MouseEvent) => {
-      // uiOffsetを考慮してウィンドウ全体での位置を計算
-      const windowWidth = window.innerWidth
-      const x = e.clientX + uiOffset
-      const ratio = Math.min(Math.max((x / windowWidth) * 100, 10), 90)
+  const handleMouseMove = useCallback((e: MouseEvent) => {
+    // ドラッグ中はuiViewが全画面なので、そのまま計算
+    const windowWidth = window.innerWidth
+    const ratio = Math.min(Math.max((e.clientX / windowWidth) * 100, 10), 90)
 
-      // ローカル状態を更新
-      setSettings((prev) => ({ ...prev, splitRatio: ratio }))
+    // ローカル状態を更新
+    setSettings((prev) => ({ ...prev, splitRatio: ratio }))
 
-      // メインプロセスにリアルタイム通知（WebContentsViewのリサイズ）
-      window.api.updateSplitRatio(ratio)
-    },
-    [uiOffset]
-  )
+    // メインプロセスにリアルタイム通知（WebContentsViewのリサイズ）
+    window.api.updateSplitRatio(ratio)
+  }, [])
 
   const handleMouseUp = useCallback(() => {
     setIsDragging(false)
+    // メインプロセスに通知（uiViewを元のサイズに戻す）
+    window.api.stopDragging()
     // 最終的なsplitRatioを保存
     window.api.getSettings().then((current) => {
       window.api.saveSettings({ ...current, splitRatio: settings.splitRatio })
@@ -97,28 +77,19 @@ function App(): React.JSX.Element {
   const showLeftButton = !leftUrl
   const showRightButton = !rightUrl
 
-  // uiView内での分割バー位置を計算
-  // uiOffsetが0の場合（左側未設定）: 通常の位置計算
-  // uiOffsetがある場合（左側設定済み）: uiView開始位置からのオフセット
-  const dividerPosition = uiOffset === 0
-    ? `calc(${settings.splitRatio}% - ${DIVIDER_WIDTH / 2}px)`
-    : '0px'
-
-  // 設定ボタンコンテナの幅を計算
-  const leftButtonWidth = uiOffset === 0
-    ? `calc(${settings.splitRatio}% - ${DIVIDER_WIDTH / 2}px)`
-    : '0px'
+  // 分割バーの位置を計算
+  const dividerLeft = `calc(${settings.splitRatio}% - ${DIVIDER_WIDTH / 2}px)`
 
   return (
     <div
       className={isDragging ? 'overlay-container dragging' : 'overlay-container'}
       ref={containerRef}
     >
-      {/* 左側の設定ボタン（URLが未設定時のみ、uiOffsetが0の場合のみ表示可能） */}
-      {showLeftButton && uiOffset === 0 && (
+      {/* 左側の設定ボタン（URLが未設定時のみ） */}
+      {showLeftButton && (
         <div
           className="setup-button-container"
-          style={{ left: 0, width: leftButtonWidth }}
+          style={{ left: 0, width: dividerLeft }}
         >
           <button onClick={openSettings} className="setup-button">
             {settings.swapped ? '右側' : '左側'}のURLを設定
@@ -130,7 +101,7 @@ function App(): React.JSX.Element {
       <div
         className={isDragging ? 'divider dragging' : 'divider'}
         style={{
-          left: dividerPosition,
+          left: dividerLeft,
           width: DIVIDER_WIDTH,
           backgroundColor: settings.dividerColor
         }}
@@ -142,9 +113,7 @@ function App(): React.JSX.Element {
         <div
           className="setup-button-container"
           style={{
-            left: uiOffset === 0
-              ? `calc(${settings.splitRatio}% + ${DIVIDER_WIDTH / 2}px)`
-              : `${DIVIDER_WIDTH}px`,
+            left: `calc(${settings.splitRatio}% + ${DIVIDER_WIDTH / 2}px)`,
             right: 0,
             width: 'auto'
           }}
