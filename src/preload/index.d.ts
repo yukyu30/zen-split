@@ -12,6 +12,7 @@ export interface AppAPI {
   getSettings: () => Promise<AppSettings>
   saveSettings: (settings: AppSettings) => Promise<boolean>
   openSettings: () => void
+  updateSplitRatio: (ratio: number) => void
   onSettingsUpdated: (callback: (settings: AppSettings) => void) => () => void
 }
 

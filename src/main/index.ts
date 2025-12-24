@@ -1,4 +1,4 @@
-import { app, shell, BrowserWindow, ipcMain, Menu } from 'electron'
+import { app, shell, BaseWindow, WebContentsView, ipcMain, Menu, session } from 'electron'
 import { join } from 'path'
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
@@ -56,91 +56,179 @@ function saveSettings(settings: AppSettings): void {
   }
 }
 
-let mainWindow: BrowserWindow | null = null
-let settingsWindow: BrowserWindow | null = null
+let mainWindow: BaseWindow | null = null
+let leftView: WebContentsView | null = null
+let rightView: WebContentsView | null = null
+let uiView: WebContentsView | null = null
+let settingsWindow: BaseWindow | null = null
+let settingsView: WebContentsView | null = null
+
+// 分割バーの幅
+const DIVIDER_WIDTH = 6
+
+// 現在の設定を保持
+let currentSettings: AppSettings = defaultSettings
+
+// WebContentsViewのレイアウトを更新
+function updateViewBounds(): void {
+  if (!mainWindow || !leftView || !rightView || !uiView) return
+
+  const bounds = mainWindow.getBounds()
+  const width = bounds.width
+  const height = bounds.height
+
+  // swappedに応じてURLを入れ替え
+  const leftRatio = currentSettings.swapped
+    ? 100 - currentSettings.splitRatio
+    : currentSettings.splitRatio
+
+  const leftWidth = Math.floor((width * leftRatio) / 100) - DIVIDER_WIDTH / 2
+  const rightWidth = width - leftWidth - DIVIDER_WIDTH
+
+  // 左側のビュー
+  leftView.setBounds({
+    x: 0,
+    y: 0,
+    width: leftWidth,
+    height: height
+  })
+
+  // 右側のビュー
+  rightView.setBounds({
+    x: leftWidth + DIVIDER_WIDTH,
+    y: 0,
+    width: rightWidth,
+    height: height
+  })
+
+  // UIオーバーレイ（全画面）
+  uiView.setBounds({
+    x: 0,
+    y: 0,
+    width: width,
+    height: height
+  })
+}
+
+// URLを読み込む
+function loadUrls(): void {
+  if (!leftView || !rightView) return
+
+  const leftUrl = currentSettings.swapped ? currentSettings.rightUrl : currentSettings.leftUrl
+  const rightUrl = currentSettings.swapped ? currentSettings.leftUrl : currentSettings.rightUrl
+
+  if (leftUrl) {
+    leftView.webContents.loadURL(leftUrl)
+  } else {
+    leftView.webContents.loadURL('about:blank')
+  }
+
+  if (rightUrl) {
+    rightView.webContents.loadURL(rightUrl)
+  } else {
+    rightView.webContents.loadURL('about:blank')
+  }
+}
 
 function createWindow(): void {
-  // Create the browser window.
-  mainWindow = new BrowserWindow({
+  currentSettings = loadSettings()
+
+  // 永続化セッションを作成
+  const leftSession = session.fromPartition('persist:left')
+  const rightSession = session.fromPartition('persist:right')
+
+  // BaseWindowを作成
+  mainWindow = new BaseWindow({
     width: 1200,
     height: 800,
     show: false,
-    autoHideMenuBar: false,
-    ...(process.platform === 'linux' ? { icon } : {}),
+    ...(process.platform === 'linux' ? { icon } : {})
+  })
+
+  // 左側のWebContentsView（永続化セッション使用）
+  leftView = new WebContentsView({
+    webPreferences: {
+      sandbox: true,
+      session: leftSession
+    }
+  })
+
+  // 右側のWebContentsView（永続化セッション使用）
+  rightView = new WebContentsView({
+    webPreferences: {
+      sandbox: true,
+      session: rightSession
+    }
+  })
+
+  // UIオーバーレイ（分割バー用）
+  uiView = new WebContentsView({
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       sandbox: false,
-      webviewTag: true,
-      backgroundThrottling: false,
-      spellcheck: false
+      backgroundThrottling: false
     }
   })
+
+  // 背景を透明に設定
+  uiView.setBackgroundColor('#00000000')
+
+  // ビューを追加（順序が重要：UIが最前面）
+  mainWindow.contentView.addChildView(leftView)
+  mainWindow.contentView.addChildView(rightView)
+  mainWindow.contentView.addChildView(uiView)
+
+  // 外部リンクを既定のブラウザで開く
+  leftView.webContents.setWindowOpenHandler((details) => {
+    shell.openExternal(details.url)
+    return { action: 'deny' }
+  })
+
+  rightView.webContents.setWindowOpenHandler((details) => {
+    shell.openExternal(details.url)
+    return { action: 'deny' }
+  })
+
+  // UIをロード
+  if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
+    uiView.webContents.loadURL(process.env['ELECTRON_RENDERER_URL'])
+  } else {
+    uiView.webContents.loadFile(join(__dirname, '../renderer/index.html'))
+  }
+
+  // URLを読み込む
+  loadUrls()
+
+  // レイアウトを更新
+  updateViewBounds()
 
   mainWindow.on('ready-to-show', () => {
     mainWindow?.show()
   })
 
-  mainWindow.webContents.setWindowOpenHandler((details) => {
-    shell.openExternal(details.url)
-    return { action: 'deny' }
+  // ウィンドウリサイズ時にレイアウトを更新
+  mainWindow.on('resize', () => {
+    updateViewBounds()
   })
-
-  // HMR for renderer base on electron-vite cli.
-  // Load the remote URL for development or the local html file for production.
-  if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
-    mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL'])
-  } else {
-    mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
-  }
-}
-
-// 設定ウィンドウを事前作成（非表示）
-function prepareSettingsWindow(): void {
-  if (settingsWindow) return
-
-  settingsWindow = new BrowserWindow({
-    width: 600,
-    height: 300,
-    parent: mainWindow || undefined,
-    modal: false,
-    show: false,
-    resizable: false,
-    webPreferences: {
-      preload: join(__dirname, '../preload/index.js'),
-      sandbox: false,
-      backgroundThrottling: false
-    }
-  })
-
-  settingsWindow.on('closed', () => {
-    settingsWindow = null
-    // 閉じたら再度準備
-    setTimeout(prepareSettingsWindow, 100)
-  })
-
-  if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
-    settingsWindow.loadURL(`${process.env['ELECTRON_RENDERER_URL']}/settings.html`)
-  } else {
-    settingsWindow.loadFile(join(__dirname, '../renderer/settings.html'))
-  }
 }
 
 // 設定ウィンドウを表示
 function showSettingsWindow(): void {
   if (settingsWindow) {
-    settingsWindow.show()
     settingsWindow.focus()
     return
   }
 
-  // ウィンドウがない場合は作成して表示
-  settingsWindow = new BrowserWindow({
+  settingsWindow = new BaseWindow({
     width: 600,
     height: 300,
     parent: mainWindow || undefined,
     modal: false,
     show: false,
-    resizable: false,
+    resizable: false
+  })
+
+  settingsView = new WebContentsView({
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       sandbox: false,
@@ -148,19 +236,33 @@ function showSettingsWindow(): void {
     }
   })
 
-  settingsWindow.on('closed', () => {
-    settingsWindow = null
+  settingsWindow.contentView.addChildView(settingsView)
+
+  // 設定ウィンドウ全体にビューを配置
+  const bounds = settingsWindow.getBounds()
+  settingsView.setBounds({ x: 0, y: 0, width: bounds.width, height: bounds.height })
+
+  settingsWindow.on('resize', () => {
+    if (settingsWindow && settingsView) {
+      const b = settingsWindow.getBounds()
+      settingsView.setBounds({ x: 0, y: 0, width: b.width, height: b.height })
+    }
   })
 
-  settingsWindow.once('ready-to-show', () => {
-    settingsWindow?.show()
+  settingsWindow.on('closed', () => {
+    settingsWindow = null
+    settingsView = null
   })
 
   if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
-    settingsWindow.loadURL(`${process.env['ELECTRON_RENDERER_URL']}/settings.html`)
+    settingsView.webContents.loadURL(`${process.env['ELECTRON_RENDERER_URL']}/settings.html`)
   } else {
-    settingsWindow.loadFile(join(__dirname, '../renderer/settings.html'))
+    settingsView.webContents.loadFile(join(__dirname, '../renderer/settings.html'))
   }
+
+  settingsView.webContents.once('did-finish-load', () => {
+    settingsWindow?.show()
+  })
 }
 
 // メニューを作成
@@ -227,15 +329,36 @@ app.whenReady().then(() => {
 
   // 設定の取得
   ipcMain.handle('get-settings', () => {
-    return loadSettings()
+    return currentSettings
   })
 
   // 設定の保存
   ipcMain.handle('save-settings', (_, settings: AppSettings) => {
+    const urlChanged =
+      settings.leftUrl !== currentSettings.leftUrl ||
+      settings.rightUrl !== currentSettings.rightUrl ||
+      settings.swapped !== currentSettings.swapped
+
+    currentSettings = settings
     saveSettings(settings)
+
+    // URLが変更された場合は再読み込み
+    if (urlChanged) {
+      loadUrls()
+    }
+
+    // レイアウトを更新
+    updateViewBounds()
+
     // メインウィンドウに設定更新を通知
-    mainWindow?.webContents.send('settings-updated', settings)
+    uiView?.webContents.send('settings-updated', settings)
     return true
+  })
+
+  // splitRatioの更新（ドラッグ中の軽量更新）
+  ipcMain.on('update-split-ratio', (_, ratio: number) => {
+    currentSettings.splitRatio = ratio
+    updateViewBounds()
   })
 
   // 設定ウィンドウを開く
@@ -246,15 +369,10 @@ app.whenReady().then(() => {
   createMenu()
   createWindow()
 
-  // メインウィンドウ表示後に設定ウィンドウを事前準備
-  mainWindow?.once('ready-to-show', () => {
-    setTimeout(prepareSettingsWindow, 500)
-  })
-
   app.on('activate', function () {
     // On macOS it's common to re-create a window in the app when the
     // dock icon is clicked and there are no other windows open.
-    if (BrowserWindow.getAllWindows().length === 0) createWindow()
+    if (mainWindow === null) createWindow()
   })
 })
 
