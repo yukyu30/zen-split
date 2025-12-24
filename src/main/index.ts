@@ -101,11 +101,29 @@ function updateViewBounds(): void {
     height: height
   })
 
-  // UIオーバーレイ（全画面）
+  // UIオーバーレイ（分割バー領域のみ - クリック透過のため）
+  // URLが未設定の場合は、その領域もカバーする
+  const leftUrl = currentSettings.swapped ? currentSettings.rightUrl : currentSettings.leftUrl
+  const rightUrl = currentSettings.swapped ? currentSettings.leftUrl : currentSettings.rightUrl
+
+  let uiX = leftWidth
+  let uiWidth = DIVIDER_WIDTH
+
+  // 左側URLが未設定の場合、左側領域もカバー
+  if (!leftUrl) {
+    uiX = 0
+    uiWidth = leftWidth + DIVIDER_WIDTH
+  }
+
+  // 右側URLが未設定の場合、右側領域もカバー
+  if (!rightUrl) {
+    uiWidth = width - uiX
+  }
+
   uiView.setBounds({
-    x: 0,
+    x: uiX,
     y: 0,
-    width: width,
+    width: uiWidth,
     height: height
   })
 }
