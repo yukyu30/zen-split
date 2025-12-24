@@ -6,14 +6,18 @@ import './App.css'
 const WebViewPane = memo(function WebViewPane({
   url,
   label,
+  partition,
   onOpenSettings
 }: {
   url: string
   label: string
+  partition: string
   onOpenSettings: () => void
 }) {
   if (url) {
-    return <webview src={url} className="webview" />
+    // partition="persist:..."を使用してセッションを永続化
+    // これによりクッキー、localStorage、ログイン状態等がディスクに保存される
+    return <webview src={url} className="webview" partition={partition} />
   }
   return (
     <div className="placeholder">
@@ -91,15 +95,20 @@ function App(): React.JSX.Element {
   }, [])
 
   // swappedに応じてURLを決定（メモ化）
-  const { firstUrl, secondUrl, firstLabel, secondLabel } = useMemo(
-    () => ({
-      firstUrl: settings.swapped ? settings.rightUrl : settings.leftUrl,
-      secondUrl: settings.swapped ? settings.leftUrl : settings.rightUrl,
-      firstLabel: settings.swapped ? '右側' : '左側',
-      secondLabel: settings.swapped ? '左側' : '右側'
-    }),
-    [settings.swapped, settings.leftUrl, settings.rightUrl]
-  )
+  // partitionはURLに紐づけて永続化（swappedしてもセッションは維持される）
+  const { firstUrl, secondUrl, firstLabel, secondLabel, firstPartition, secondPartition } =
+    useMemo(
+      () => ({
+        firstUrl: settings.swapped ? settings.rightUrl : settings.leftUrl,
+        secondUrl: settings.swapped ? settings.leftUrl : settings.rightUrl,
+        firstLabel: settings.swapped ? '右側' : '左側',
+        secondLabel: settings.swapped ? '左側' : '右側',
+        // セッションはleft/rightのURLに紐づくので、swapped時はパーティションも入れ替え
+        firstPartition: settings.swapped ? 'persist:right' : 'persist:left',
+        secondPartition: settings.swapped ? 'persist:left' : 'persist:right'
+      }),
+      [settings.swapped, settings.leftUrl, settings.rightUrl]
+    )
 
   // スタイルをメモ化
   const firstContainerStyle = useMemo(
@@ -122,13 +131,23 @@ function App(): React.JSX.Element {
   return (
     <div className={containerClass} ref={containerRef}>
       <div className={paneClass} style={firstContainerStyle}>
-        <WebViewPane url={firstUrl} label={firstLabel} onOpenSettings={openSettings} />
+        <WebViewPane
+          url={firstUrl}
+          label={firstLabel}
+          partition={firstPartition}
+          onOpenSettings={openSettings}
+        />
       </div>
 
       <div className={dividerClass} style={dividerStyle} onMouseDown={handleMouseDown} />
 
       <div className={paneClass} style={secondContainerStyle}>
-        <WebViewPane url={secondUrl} label={secondLabel} onOpenSettings={openSettings} />
+        <WebViewPane
+          url={secondUrl}
+          label={secondLabel}
+          partition={secondPartition}
+          onOpenSettings={openSettings}
+        />
       </div>
     </div>
   )
