@@ -10,45 +10,38 @@ body,
   height: 100%;
   width: 100%;
   overflow: hidden;
+  /* 透明背景 */
+  background: transparent;
 }
 
-.app-container {
-  display: flex;
+/* UIオーバーレイコンテナ（透明、マウスイベントは通過） */
+.overlay-container {
+  position: relative;
   height: 100%;
   width: 100%;
-  background-color: #1e1e1e;
-}
-
-.app-container.dragging {
-  cursor: col-resize;
-  user-select: none;
-}
-
-.webview-container {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-.webview {
-  flex: 1;
-  width: 100%;
-  height: 100%;
-  border: none;
-}
-
-.webview-container.dragging .webview,
-.webview-container.dragging .placeholder {
+  background: transparent;
+  /* デフォルトでマウスイベントを通過させる */
   pointer-events: none;
 }
 
-.placeholder {
-  flex: 1;
+.overlay-container.dragging {
+  cursor: col-resize;
+  user-select: none;
+  /* ドラッグ中は全体でイベントを受け取る */
+  pointer-events: auto;
+}
+
+/* 設定ボタンコンテナ（URLが未設定時に表示） */
+.setup-button-container {
+  position: absolute;
+  top: 0;
+  height: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
-  background-color: #2d2d2d;
+  background-color: rgba(45, 45, 45, 0.95);
+  /* ボタンはクリック可能 */
+  pointer-events: auto;
 }
 
 .setup-button {
@@ -70,19 +63,19 @@ body,
   background-color: #005a9e;
 }
 
+/* 分割バー */
 .divider {
-  width: 6px;
+  position: absolute;
+  top: 0;
+  height: 100%;
   background-color: #3c3c3c;
   cursor: col-resize;
   transition: background-color 0.2s;
-  flex-shrink: 0;
+  /* 分割バーはクリック可能 */
+  pointer-events: auto;
 }
 
 .divider:hover,
 .divider.dragging {
   background-color: #0078d4;
-}
-
-.divider.dragging {
-  cursor: col-resize;
 }

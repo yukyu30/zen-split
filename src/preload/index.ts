@@ -22,6 +22,9 @@ const api = {
   // 設定ウィンドウを開く
   openSettings: (): void => ipcRenderer.send('open-settings'),
 
+  // splitRatioをリアルタイム更新（ドラッグ中）
+  updateSplitRatio: (ratio: number): void => ipcRenderer.send('update-split-ratio', ratio),
+
   // 設定更新の通知を受け取る
   onSettingsUpdated: (callback: (settings: AppSettings) => void): (() => void) => {
     const handler = (_event: Electron.IpcRendererEvent, settings: AppSettings): void => {
