@@ -14,6 +14,7 @@ function App(): React.JSX.Element {
     swapped: false
   })
   const [isDragging, setIsDragging] = useState(false)
+  const [uiOffset, setUiOffset] = useState(0)
   const containerRef = useRef<HTMLDivElement>(null)
 
   // 設定を読み込む
@@ -25,6 +26,25 @@ function App(): React.JSX.Element {
     return unsubscribe
   }, [])
 
+  // UIオフセットを計算（uiViewの開始位置）
+  useEffect(() => {
+    if (!containerRef.current) return
+
+    const leftUrl = settings.swapped ? settings.rightUrl : settings.leftUrl
+
+    // uiViewが分割バー位置から開始する場合のオフセットを計算
+    // メインプロセスと同じロジック
+    if (leftUrl) {
+      // 左側URLが設定されている場合、uiViewは分割バー位置から開始
+      const width = window.innerWidth
+      const leftRatio = settings.swapped ? 100 - settings.splitRatio : settings.splitRatio
+      const leftWidth = Math.floor((width * leftRatio) / 100) - DIVIDER_WIDTH / 2
+      setUiOffset(leftWidth)
+    } else {
+      setUiOffset(0)
+    }
+  }, [settings])
+
   // 分割バーのドラッグ処理
   const handleMouseDown = useCallback(() => {
     setIsDragging(true)
@@ -32,11 +52,10 @@ function App(): React.JSX.Element {
 
   const handleMouseMove = useCallback(
     (e: MouseEvent) => {
-      if (!containerRef.current) return
-
-      const rect = containerRef.current.getBoundingClientRect()
-      const x = e.clientX - rect.left
-      const ratio = Math.min(Math.max((x / rect.width) * 100, 10), 90)
+      // uiOffsetを考慮してウィンドウ全体での位置を計算
+      const windowWidth = window.innerWidth
+      const x = e.clientX + uiOffset
+      const ratio = Math.min(Math.max((x / windowWidth) * 100, 10), 90)
 
       // ローカル状態を更新
       setSettings((prev) => ({ ...prev, splitRatio: ratio }))
@@ -44,7 +63,7 @@ function App(): React.JSX.Element {
       // メインプロセスにリアルタイム通知（WebContentsViewのリサイズ）
       window.api.updateSplitRatio(ratio)
     },
-    []
+    [uiOffset]
   )
 
   const handleMouseUp = useCallback(() => {
@@ -72,25 +91,34 @@ function App(): React.JSX.Element {
     window.api.openSettings()
   }, [])
 
-  // 分割バーの位置を計算
-  const dividerLeft = `calc(${settings.splitRatio}% - ${DIVIDER_WIDTH / 2}px)`
-
   // URLが未設定かどうか
   const leftUrl = settings.swapped ? settings.rightUrl : settings.leftUrl
   const rightUrl = settings.swapped ? settings.leftUrl : settings.rightUrl
   const showLeftButton = !leftUrl
   const showRightButton = !rightUrl
 
+  // uiView内での分割バー位置を計算
+  // uiOffsetが0の場合（左側未設定）: 通常の位置計算
+  // uiOffsetがある場合（左側設定済み）: uiView開始位置からのオフセット
+  const dividerPosition = uiOffset === 0
+    ? `calc(${settings.splitRatio}% - ${DIVIDER_WIDTH / 2}px)`
+    : '0px'
+
+  // 設定ボタンコンテナの幅を計算
+  const leftButtonWidth = uiOffset === 0
+    ? `calc(${settings.splitRatio}% - ${DIVIDER_WIDTH / 2}px)`
+    : '0px'
+
   return (
     <div
       className={isDragging ? 'overlay-container dragging' : 'overlay-container'}
       ref={containerRef}
     >
-      {/* 左側の設定ボタン（URLが未設定時のみ） */}
-      {showLeftButton && (
+      {/* 左側の設定ボタン（URLが未設定時のみ、uiOffsetが0の場合のみ表示可能） */}
+      {showLeftButton && uiOffset === 0 && (
         <div
           className="setup-button-container"
-          style={{ left: 0, width: dividerLeft }}
+          style={{ left: 0, width: leftButtonWidth }}
         >
           <button onClick={openSettings} className="setup-button">
             {settings.swapped ? '右側' : '左側'}のURLを設定
@@ -102,7 +130,7 @@ function App(): React.JSX.Element {
       <div
         className={isDragging ? 'divider dragging' : 'divider'}
         style={{
-          left: dividerLeft,
+          left: dividerPosition,
           width: DIVIDER_WIDTH,
           backgroundColor: settings.dividerColor
         }}
@@ -114,7 +142,9 @@ function App(): React.JSX.Element {
         <div
           className="setup-button-container"
           style={{
-            left: `calc(${settings.splitRatio}% + ${DIVIDER_WIDTH / 2}px)`,
+            left: uiOffset === 0
+              ? `calc(${settings.splitRatio}% + ${DIVIDER_WIDTH / 2}px)`
+              : `${DIVIDER_WIDTH}px`,
             right: 0,
             width: 'auto'
           }}
