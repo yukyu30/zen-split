@@ -13,6 +13,8 @@ export interface AppAPI {
   saveSettings: (settings: AppSettings) => Promise<boolean>
   openSettings: () => void
   updateSplitRatio: (ratio: number) => void
+  startDragging: () => void
+  stopDragging: () => void
   onSettingsUpdated: (callback: (settings: AppSettings) => void) => () => void
 }
 
