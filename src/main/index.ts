@@ -202,7 +202,8 @@ function createWindow(): void {
   // レイアウトを更新
   updateViewBounds()
 
-  mainWindow.on('ready-to-show', () => {
+  // UIビューの読み込み完了時にウィンドウを表示
+  uiView.webContents.once('did-finish-load', () => {
     mainWindow?.show()
   })
 
